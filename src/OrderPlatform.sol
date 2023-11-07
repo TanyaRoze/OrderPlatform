@@ -5,7 +5,7 @@ import "./interfaces/IERC20.sol";
 import "./interfaces/IOrderPlatform.sol";
 
 contract OrderPlatform {
-
+    
     uint8 constant MAX_COUNT_ORDER = 10;
     bool reentrancyLock = false;
 
@@ -16,6 +16,7 @@ contract OrderPlatform {
     address[] judgeMembers;
 
     event CreatedOrder(address indexed customer, address indexed executor, string title);
+    event DepositedOrder(address indexed customer, address indexed executor, string title);
     event NewJudgeOrder(address indexed customer, address indexed executor, address indexed judge, string title);
     event SubmittedOrder(address indexed customer, address indexed executor, string title);
     event DeclinedOrder(address indexed customer, address indexed executor, string title);
@@ -55,6 +56,7 @@ contract OrderPlatform {
     error E_Unauthorized();
     error E_NotEnoughBalance();
     error E_IndexList();
+    error E_NoActiveOrder();
 
     modifier onlyOwner {
         if(msg.sender != admin) revert E_Unauthorized();
@@ -136,6 +138,9 @@ contract OrderPlatform {
         
         OrdersList[msg.sender][indexOrder].balance = value;
         OrdersList[msg.sender][indexOrder].isActive = true;
+
+        emit DepositedOrder(order.param.customer, order.param.executor, order.param.title);
+
     }
 
     function confirmOrder(address customer, uint indexOrder)  external acceptedOrder(customer, indexOrder) nonReentrancy returns(Order memory) {
@@ -217,6 +222,14 @@ contract OrderPlatform {
         return healthScoreExecutor[user];
     }
 
+    function getAdmin() external view returns(address){
+        return admin;
+    }
+
+    function getFees() external view returns(uint[2] memory){
+        return [feeOrder, feeJudge];
+    }
+
     //setters
 
     function changeAdmin(address newAdmin) external onlyOwner returns(address){
@@ -224,7 +237,10 @@ contract OrderPlatform {
     }
 
     function changeJudgeOrder(address customer, uint indexOrder) external onlyOwner returns(Order memory){
+        Order memory order = OrdersList[customer][indexOrder];
+        if(!order.isActive) revert E_NoActiveOrder();
         if(indexOrder >= 10) revert E_IndexList();
+
         return _setNewJudgeOrder(customer, indexOrder);
     }
 
@@ -243,7 +259,7 @@ contract OrderPlatform {
         return feeOrder = newFee;
     }
 
-    function changeJudgeOrder(uint newFee) external onlyOwner returns(uint){
+    function changeFeeJudge(uint newFee) external onlyOwner returns(uint){
         require(newFee < feeOrder, "Judge fee must be less than order fee!");
         return feeJudge = newFee;
     }

@@ -139,8 +139,6 @@ contract ConditionTest is Test {
         uint balanceJudge = platform.getBalance(address(this), address(TST));
         uint balance = platform.getBalance(address(platform), address(TST));
 
-        console2.log(balanceAlice, balanceJudge, balance);
-
         assertEq(balanceAlice + balance + balanceJudge, order.balance);
     }
     

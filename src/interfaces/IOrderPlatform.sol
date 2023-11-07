@@ -2,8 +2,9 @@
 pragma solidity ^0.8.20;
 
 interface IOrderPlatform {
-    
+
     event CreatedOrder(address indexed customer, address indexed executor, string title);
+    event DepositedOrder(address indexed customer, address indexed executor, string title);
     event NewJudgeOrder(address indexed customer, address indexed executor, address indexed judge, string title);
     event SubmittedOrder(address indexed customer, address indexed executor, string title);
     event DeclinedOrder(address indexed customer, address indexed executor, string title);
@@ -46,6 +47,9 @@ interface IOrderPlatform {
     function previewFeeOrder(uint amount, uint fee) external pure returns(uint);
     function previewFullPriceOrder(uint amount) external view returns(uint);
     function getBalance(address user, address token) external view returns(uint);
+    function getHealhScoreJudge(address user) external view returns(uint[2] memory);
+    function getHealhScoreCustomer(address user) external view returns(uint[2] memory);
+    function getHealhScoreExecutor(address user) external view returns(uint[2] memory);
     
     //setters
     function changeAdmin(address newAdmin) external returns(address);
