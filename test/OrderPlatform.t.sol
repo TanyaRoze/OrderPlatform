@@ -20,7 +20,7 @@ contract OrderPlatformTest is Test {
     address public judge;
 
     function setUp() public {
-        platform = new OrderPlatform();
+        platform = new OrderPlatform(address(this));
         TST = new TestERC20("Test Token", "TST" , 18, false);
 
         alice = vm.addr(1000);

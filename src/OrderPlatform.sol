@@ -18,16 +18,17 @@ contract OrderPlatform {
     event NewJudgeOrder(address indexed customer, address indexed executor, address indexed judge, string title);
     event SubmittedOrder(address indexed customer, address indexed executor, string title);
     event DeclinedOrder(address indexed customer, address indexed executor, string title);
+    event ClosedOrder(address indexed customer, address indexed executor, string title);
 
     mapping(address => Order[MAX_COUNT_ORDER]) OrdersList;
     mapping(address user => mapping(address token => uint balance)) balanceUser;
 
-    mapping(address => uint) healthScoreCustomer; //count success orders
-    mapping(address => uint) healthScoreExecutor; //count success orders
-    mapping(address => uint[2]) healthScoreJudge; //count success orders in customer side, executor side
+    mapping(address => uint[2]) healthScoreCustomer; //count success/fail orders
+    mapping(address => uint[2]) healthScoreExecutor; 
+    mapping(address => uint[2]) healthScoreJudge; 
 
-    constructor() {
-        admin = msg.sender;
+    constructor(address _admin) {
+        admin = _admin;
     }
 
     struct OrderParam {
@@ -88,6 +89,7 @@ contract OrderPlatform {
             }
             if(order.confirmJudge == 2){
                 _closeOrder(customer, indexOrder, false);
+
             }
         }
     }
@@ -144,6 +146,8 @@ contract OrderPlatform {
 
         if(order.judge == msg.sender) OrdersList[customer][indexOrder].confirmJudge = 1;
 
+        emit SubmittedOrder(order.param.customer, order.param.executor, order.param.title);
+
         return OrdersList[customer][indexOrder];
     }
 
@@ -158,6 +162,8 @@ contract OrderPlatform {
         if(order.param.customer == msg.sender) OrdersList[customer][indexOrder].confirmCustomer = 2;
         
         if(order.judge == msg.sender) OrdersList[customer][indexOrder].confirmJudge = 2;
+
+        emit DeclinedOrder(order.param.customer, order.param.executor, order.param.title);
 
         return OrdersList[customer][indexOrder];
     }
@@ -192,6 +198,18 @@ contract OrderPlatform {
         return balanceUser[user][token];
     }
 
+    function getHealhScoreJudge(address user) external view returns(uint[2] memory){
+        return healthScoreJudge[user];
+    }
+
+    function getHealhScoreCustomer(address user) external view returns(uint[2] memory){
+        return healthScoreCustomer[user];
+    }
+
+    function getHealhScoreExecutor(address user) external view returns(uint[2] memory){
+        return healthScoreExecutor[user];
+    }
+
     //setters
 
     function changeAdmin(address newAdmin) external onlyOwner returns(address){
@@ -224,6 +242,21 @@ contract OrderPlatform {
 
     //internal
 
+    function _changeHealhScoreExecutor(address executor, bool confirm) internal returns(uint) {
+        if(confirm) return healthScoreExecutor[executor][0] += 1;
+        else return healthScoreExecutor[executor][1] += 1;
+    }
+
+    function _changeHealhScoreCustomer(address customer, bool confirm) internal returns(uint) {
+        if(confirm) return healthScoreCustomer[customer][0] += 1;
+        else return healthScoreCustomer[customer][1] += 1;
+    }
+
+    function _changeHealhScoreJudge(address judge, bool confirm) internal returns(uint) {
+        if(confirm) return healthScoreJudge[judge][0] += 1;
+        else return healthScoreJudge[judge][1] += 1;
+    }
+
     function _closeOrder(address customer, uint indexOrder, bool success) internal returns(Order memory){
         Order memory order = OrdersList[customer][indexOrder];
         uint fee;
@@ -234,7 +267,8 @@ contract OrderPlatform {
             
             fee = previewFeeOrder(order.param.amount, feeJudge);
             balanceUser[order.judge][order.param.token] += fee;
-            
+
+            _changeHealhScoreJudge(order.judge, success);
         }else{
             fee = previewFeeOrder(order.param.amount, feeOrder);
             balanceUser[address(this)][order.param.token] += fee;
@@ -249,6 +283,11 @@ contract OrderPlatform {
         OrdersList[msg.sender][indexOrder].balance = 0;
         OrdersList[msg.sender][indexOrder].isActive = false;
 
+        _changeHealhScoreExecutor(order.param.executor, success);
+        _changeHealhScoreCustomer(order.param.customer, success);
+
+        emit ClosedOrder(order.param.customer, order.param.executor, order.param.title);
+
         return OrdersList[msg.sender][indexOrder];
     }
 
@@ -261,6 +300,8 @@ contract OrderPlatform {
             judge = judgeMembers[index];
         }
         OrdersList[customer][indexOrder].judge = judge;
+
+        emit NewJudgeOrder(order.param.customer, order.param.executor, judge, order.param.title);
 
         return OrdersList[customer][indexOrder];
     }

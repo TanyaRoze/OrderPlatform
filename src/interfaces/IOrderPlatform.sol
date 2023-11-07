@@ -2,10 +2,12 @@
 pragma solidity ^0.8.20;
 
 interface IOrderPlatform {
+    
     event CreatedOrder(address indexed customer, address indexed executor, string title);
     event NewJudgeOrder(address indexed customer, address indexed executor, address indexed judge, string title);
     event SubmittedOrder(address indexed customer, address indexed executor, string title);
     event DeclinedOrder(address indexed customer, address indexed executor, string title);
+    event ClosedOrder(address indexed customer, address indexed executor, string title);
 
     error E_Reentrancy();
     error E_Unauthorized();
