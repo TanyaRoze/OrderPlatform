@@ -5,6 +5,7 @@ import "./interfaces/IERC20.sol";
 import "./interfaces/IOrderPlatform.sol";
 
 contract OrderPlatform {
+
     uint8 constant MAX_COUNT_ORDER = 10;
     bool reentrancyLock = false;
 
@@ -53,6 +54,7 @@ contract OrderPlatform {
     error E_Reentrancy();
     error E_Unauthorized();
     error E_NotEnoughBalance();
+    error E_IndexList();
 
     modifier onlyOwner {
         if(msg.sender != admin) revert E_Unauthorized();
@@ -97,6 +99,7 @@ contract OrderPlatform {
     //order's functions
 
     function previewOrder(OrderParam memory param, uint indexOrder) public view returns(bool){
+        if(indexOrder >= 10) revert E_IndexList();
         require(param.executor != address(0), "Executor address incorrect!");
         require(param.customer != address(0), "Customer address incorrect!");
         require(param.customer == msg.sender, "Only customer can create order!");
@@ -121,6 +124,7 @@ contract OrderPlatform {
     }
 
     function depositOrder(uint indexOrder) external nonReentrancy returns(bool status) {
+        if(indexOrder >= 10) revert E_IndexList();
         Order memory order = OrdersList[msg.sender][indexOrder];
 
         require(order.param.customer == msg.sender, "Not created order!");
@@ -135,6 +139,7 @@ contract OrderPlatform {
     }
 
     function confirmOrder(address customer, uint indexOrder)  external acceptedOrder(customer, indexOrder) nonReentrancy returns(Order memory) {
+        if(indexOrder >= 10) revert E_IndexList();
         Order memory order = OrdersList[customer][indexOrder];
         
         require(order.isActive, "Order isn't active!");
@@ -152,6 +157,7 @@ contract OrderPlatform {
     }
 
     function declineOrder(address customer, uint indexOrder) external acceptedOrder(customer, indexOrder) nonReentrancy returns(Order memory) {
+        if(indexOrder >= 10) revert E_IndexList();
         Order memory order = OrdersList[customer][indexOrder];
 
         require(order.isActive, "Order isn't active!");
@@ -179,6 +185,7 @@ contract OrderPlatform {
     }
 
     function getOrder(address customer,  uint indexOrder) external view returns(Order memory order){
+        if(indexOrder >= 10) revert E_IndexList();
         return OrdersList[customer][indexOrder];
     }
 
@@ -217,6 +224,7 @@ contract OrderPlatform {
     }
 
     function changeJudgeOrder(address customer, uint indexOrder) external onlyOwner returns(Order memory){
+        if(indexOrder >= 10) revert E_IndexList();
         return _setNewJudgeOrder(customer, indexOrder);
     }
 
