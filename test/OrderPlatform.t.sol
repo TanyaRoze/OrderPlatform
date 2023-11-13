@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import {Test, console2} from "forge-std/Test.sol";
 import { OrderPlatform } from "../src/OrderPlatform.sol";
-import { IOrderPlatform } from "../src/interfaces/IOrderPlatform.sol";
 import {TestERC20} from "./mocks/TestERC20.sol";
 
 contract OrderPlatformTest is Test {
@@ -71,9 +70,6 @@ contract OrderPlatformTest is Test {
         vm.prank(alice);
         platform.depositOrder(indexOrder);
  
-        OrderPlatform.Order memory currOrder = platform.getOrder(alice, indexOrder);
-
-        assertEq(currOrder.balance, price);
     }
 
     function  test_withdrawBalance()  public {

@@ -3,8 +3,7 @@ pragma solidity ^0.8.20;
 
 import {Test, console2} from "forge-std/Test.sol";
 import { OrderPlatform } from "../src/OrderPlatform.sol";
-import { IOrderPlatform } from "../src/interfaces/IOrderPlatform.sol";
-import {TestERC20} from "./mocks/TestERC20.sol";
+import { TestERC20 } from "./mocks/TestERC20.sol";
 
 contract ConditionTest is Test {
     OrderPlatform public platform;
@@ -50,8 +49,6 @@ contract ConditionTest is Test {
         vm.prank(alice);
         platform.depositOrder(indexOrder);
 
-        OrderPlatform.Order memory order = platform.getOrder(alice, indexOrder);
-
         vm.prank(alice);
         platform.confirmOrder(alice, indexOrder);
 
@@ -62,7 +59,7 @@ contract ConditionTest is Test {
         uint balanceBob = platform.getBalance(bob, address(TST));
         uint balance = platform.getBalance(address(platform), address(TST));
 
-        assertEq(balanceBob + balance, order.balance);
+        assertEq(balanceBob + balance, price);
     }
 
     function test_CloseOrder_FF_Condition() public {
@@ -74,8 +71,6 @@ contract ConditionTest is Test {
         vm.prank(alice);
         platform.depositOrder(indexOrder);
 
-        OrderPlatform.Order memory order = platform.getOrder(alice, indexOrder);
-
         vm.prank(alice);
         platform.declineOrder(alice, indexOrder);
 
@@ -86,7 +81,7 @@ contract ConditionTest is Test {
         uint balanceBob = platform.getBalance(alice, address(TST));
         uint balance = platform.getBalance(address(platform), address(TST));
 
-        assertEq(balanceBob + balance, order.balance);
+        assertEq(balanceBob + balance, price);
     }
 
     function test_CloseOrder_TFT_Condition() public {
@@ -97,8 +92,6 @@ contract ConditionTest is Test {
 
         vm.prank(alice);
         platform.depositOrder(indexOrder);
-
-        OrderPlatform.Order memory order = platform.getOrder(alice, indexOrder);
 
         vm.prank(alice);
         platform.declineOrder(alice, indexOrder);
@@ -112,7 +105,7 @@ contract ConditionTest is Test {
         uint balanceJudge = platform.getBalance(address(this), address(TST));
         uint balance = platform.getBalance(address(platform), address(TST));
 
-        assertEq(balanceBob + balance + balanceJudge, order.balance);
+        assertEq(balanceBob + balance + balanceJudge, price);
     }
 
     function test_CloseOrder_TFF_Condition() public {
@@ -123,8 +116,6 @@ contract ConditionTest is Test {
 
         vm.prank(alice);
         platform.depositOrder(indexOrder);
-
-        OrderPlatform.Order memory order = platform.getOrder(alice, indexOrder);
 
         vm.prank(alice);
         platform.declineOrder(alice, indexOrder);
@@ -139,7 +130,7 @@ contract ConditionTest is Test {
         uint balanceJudge = platform.getBalance(address(this), address(TST));
         uint balance = platform.getBalance(address(platform), address(TST));
 
-        assertEq(balanceAlice + balance + balanceJudge, order.balance);
+        assertEq(balanceAlice + balance + balanceJudge, price);
     }
     
 }

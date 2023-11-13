@@ -2,11 +2,12 @@
 pragma solidity ^0.8.20;
 
 import "./interfaces/IERC20.sol";
-import "./interfaces/IOrderPlatform.sol";
 
 contract OrderPlatform {
-    
     uint8 constant MAX_COUNT_ORDER = 10;
+    uint8 constant CONFIRM_FLAG = 1;
+    uint8 constant DECLINE_FLAG = 2;
+
     bool reentrancyLock = false;
 
     uint feeOrder = 200;
@@ -25,7 +26,7 @@ contract OrderPlatform {
     mapping(address => Order[MAX_COUNT_ORDER]) OrdersList;
     mapping(address user => mapping(address token => uint balance)) balanceUser;
 
-    mapping(address => uint[2]) healthScoreCustomer; //count success/fail orders
+    mapping(address => uint[2]) healthScoreCustomer; //count confirmed/refunded orders
     mapping(address => uint[2]) healthScoreExecutor; 
     mapping(address => uint[2]) healthScoreJudge; 
 
@@ -44,7 +45,6 @@ contract OrderPlatform {
     struct Order {
         OrderParam param;
         uint timestamp;
-        uint balance;
         uint8 confirmCustomer;
         uint8 confirmExecutor;
         address judge;
@@ -55,8 +55,9 @@ contract OrderPlatform {
     error E_Reentrancy();
     error E_Unauthorized();
     error E_NotEnoughBalance();
-    error E_IndexList();
     error E_NoActiveOrder();
+    error E_IndexList();
+    
 
     modifier onlyOwner {
         if(msg.sender != admin) revert E_Unauthorized();
@@ -71,37 +72,9 @@ contract OrderPlatform {
         reentrancyLock = false;
     }
 
-    modifier acceptedOrder(address customer, uint indexOrder) {
-        _;
-        Order memory order = OrdersList[customer][indexOrder];
-
-        if(order.confirmCustomer == 1 && order.confirmExecutor == 1){
-            _closeOrder(customer, indexOrder, true);
-        }
-
-        if(order.confirmCustomer == 2 && order.confirmExecutor == 2){
-            _closeOrder(customer, indexOrder, false);
-        }
-
-        if(order.judge == address(0)){
-            if(order.confirmCustomer != order.confirmExecutor && order.confirmCustomer != 0 && order.confirmExecutor != 0){
-                _setNewJudgeOrder(customer, indexOrder);
-            }
-        }else{
-            if(order.confirmJudge == 1){
-                _closeOrder(customer, indexOrder, true);
-            }
-            if(order.confirmJudge == 2){
-                _closeOrder(customer, indexOrder, false);
-
-            }
-        }
-    }
-
     //order's functions
-
     function previewOrder(OrderParam memory param, uint indexOrder) public view returns(bool){
-        if(indexOrder >= 10) revert E_IndexList();
+        if(indexOrder >= MAX_COUNT_ORDER) revert E_IndexList();
         require(param.executor != address(0), "Executor address incorrect!");
         require(param.customer != address(0), "Customer address incorrect!");
         require(param.customer == msg.sender, "Only customer can create order!");
@@ -126,7 +99,7 @@ contract OrderPlatform {
     }
 
     function depositOrder(uint indexOrder) external nonReentrancy returns(bool status) {
-        if(indexOrder >= 10) revert E_IndexList();
+        if(indexOrder >= MAX_COUNT_ORDER) revert E_IndexList();
         Order memory order = OrdersList[msg.sender][indexOrder];
 
         require(order.param.customer == msg.sender, "Not created order!");
@@ -136,51 +109,54 @@ contract OrderPlatform {
 
         status = _deposit(order.param.token, order.param.customer, value);
         
-        OrdersList[msg.sender][indexOrder].balance = value;
         OrdersList[msg.sender][indexOrder].isActive = true;
 
         emit DepositedOrder(order.param.customer, order.param.executor, order.param.title);
-
     }
 
-    function confirmOrder(address customer, uint indexOrder)  external acceptedOrder(customer, indexOrder) nonReentrancy returns(Order memory) {
-        if(indexOrder >= 10) revert E_IndexList();
+    function confirmOrder(address customer, uint indexOrder)  external nonReentrancy returns(Order memory) {
+        if(indexOrder >= MAX_COUNT_ORDER) revert E_IndexList();
         Order memory order = OrdersList[customer][indexOrder];
         
-        require(order.isActive, "Order isn't active!");
+        if(!order.isActive) revert E_NoActiveOrder();
         if(!(msg.sender == order.param.executor || msg.sender == order.param.customer || msg.sender == order.judge)) revert E_Unauthorized();
 
-        if(order.param.executor == msg.sender) OrdersList[customer][indexOrder].confirmExecutor = 1;
-
-        if(order.param.customer == msg.sender) OrdersList[customer][indexOrder].confirmCustomer = 1;
-
-        if(order.judge == msg.sender) OrdersList[customer][indexOrder].confirmJudge = 1;
+        if(order.param.executor == msg.sender) OrdersList[customer][indexOrder].confirmExecutor = CONFIRM_FLAG;
+        if(order.param.customer == msg.sender) OrdersList[customer][indexOrder].confirmCustomer = CONFIRM_FLAG;
+        if(order.judge == msg.sender) OrdersList[customer][indexOrder].confirmJudge = CONFIRM_FLAG;
 
         emit SubmittedOrder(order.param.customer, order.param.executor, order.param.title);
 
+        _acceptOrder(customer, indexOrder);
+
         return OrdersList[customer][indexOrder];
     }
 
-    function declineOrder(address customer, uint indexOrder) external acceptedOrder(customer, indexOrder) nonReentrancy returns(Order memory) {
-        if(indexOrder >= 10) revert E_IndexList();
+    function declineOrder(address customer, uint indexOrder) external nonReentrancy returns(Order memory) {
+        if(indexOrder >= MAX_COUNT_ORDER) revert E_IndexList();
         Order memory order = OrdersList[customer][indexOrder];
 
-        require(order.isActive, "Order isn't active!");
+        if(!order.isActive) revert E_NoActiveOrder();
         if(!(msg.sender == order.param.executor || msg.sender == order.param.customer || msg.sender == order.judge)) revert E_Unauthorized();
         
-        if(order.param.executor == msg.sender) OrdersList[customer][indexOrder].confirmExecutor = 2;
-        
-        if(order.param.customer == msg.sender) OrdersList[customer][indexOrder].confirmCustomer = 2;
-        
-        if(order.judge == msg.sender) OrdersList[customer][indexOrder].confirmJudge = 2;
+        if(order.param.executor == msg.sender) OrdersList[customer][indexOrder].confirmExecutor = DECLINE_FLAG;
+        if(order.param.customer == msg.sender) OrdersList[customer][indexOrder].confirmCustomer = DECLINE_FLAG;
+        if(order.judge == msg.sender) OrdersList[customer][indexOrder].confirmJudge = DECLINE_FLAG;
 
         emit DeclinedOrder(order.param.customer, order.param.executor, order.param.title);
 
+        _acceptOrder(customer, indexOrder);
+
         return OrdersList[customer][indexOrder];
     }
+
     
     function withdrawBalance(address token, uint amount) external nonReentrancy returns(bool success){
         return _withdraw(token, msg.sender, amount);
+    }
+
+    function approveBalance(address spender, address token, uint amount) external onlyOwner returns(bool success){
+        return _approve(spender, token, amount);
     }
 
     //getters
@@ -190,7 +166,7 @@ contract OrderPlatform {
     }
 
     function getOrder(address customer,  uint indexOrder) external view returns(Order memory order){
-        if(indexOrder >= 10) revert E_IndexList();
+        if(indexOrder >= MAX_COUNT_ORDER) revert E_IndexList();
         return OrdersList[customer][indexOrder];
     }
 
@@ -239,7 +215,7 @@ contract OrderPlatform {
     function changeJudgeOrder(address customer, uint indexOrder) external onlyOwner returns(Order memory){
         Order memory order = OrdersList[customer][indexOrder];
         if(!order.isActive) revert E_NoActiveOrder();
-        if(indexOrder >= 10) revert E_IndexList();
+        if(indexOrder >= MAX_COUNT_ORDER) revert E_IndexList();
 
         return _setNewJudgeOrder(customer, indexOrder);
     }
@@ -265,6 +241,32 @@ contract OrderPlatform {
     }
 
     //internal
+
+    function _acceptOrder(address customer, uint indexOrder) internal {
+        Order memory order = OrdersList[customer][indexOrder];
+
+        if(order.confirmCustomer == CONFIRM_FLAG && order.confirmExecutor == CONFIRM_FLAG){
+            _closeOrder(customer, indexOrder, true);
+        }
+
+        if(order.confirmCustomer == DECLINE_FLAG && order.confirmExecutor == DECLINE_FLAG){
+            _closeOrder(customer, indexOrder, false);
+        }
+
+        if(order.judge == address(0)){
+            if(order.confirmCustomer != order.confirmExecutor && order.confirmCustomer != 0 && order.confirmExecutor != 0){
+                _setNewJudgeOrder(customer, indexOrder);
+            }
+        }else{
+            if(order.confirmJudge == CONFIRM_FLAG){
+                _closeOrder(customer, indexOrder, true);
+            }
+            if(order.confirmJudge == DECLINE_FLAG){
+                _closeOrder(customer, indexOrder, false);
+
+            }
+        }
+    }
 
     function _changeHealhScoreExecutor(address executor, bool confirm) internal returns(uint) {
         if(confirm) return healthScoreExecutor[executor][0] += 1;
@@ -304,7 +306,6 @@ contract OrderPlatform {
             balanceUser[order.param.customer][order.param.token] += order.param.amount;
         }
         
-        OrdersList[msg.sender][indexOrder].balance = 0;
         OrdersList[msg.sender][indexOrder].isActive = false;
 
         _changeHealhScoreExecutor(order.param.executor, success);
@@ -342,8 +343,11 @@ contract OrderPlatform {
     }
 
     function _deposit(address token, address sender, uint amount) internal returns(bool){
-        require(IERC20(token).allowance(sender, address(this)) >= amount, "Not enough allowance!");
         return IERC20(token).transferFrom(sender, address(this), amount);
+    }
+
+    function _approve(address spender, address token, uint amount) internal returns(bool){
+        return IERC20(token).approve(spender, amount);
     }
 
     //pseudo random
