@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.22;
 
 import {Test, console2} from "forge-std/Test.sol";
 import { OrderPlatform } from "../src/OrderPlatform.sol";
@@ -31,8 +31,6 @@ contract OrderPlatformTest is Test {
         judge = vm.addr(3000);
         
         TST.mint(alice, 1e18);
-
-        vm.prank(alice);
 
         orderParam = OrderPlatform.OrderParam({
             customer: alice,
