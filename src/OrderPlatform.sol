@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import "./interfaces/IERC20.sol";
+import {ERC20} from "@solady/tokens/ERC20.sol";
 
 contract OrderPlatform {
     uint8 constant MAX_COUNT_ORDER = 10;
@@ -114,7 +114,7 @@ contract OrderPlatform {
         emit DepositedOrder(order.param.customer, order.param.executor, order.param.title);
     }
 
-    function confirmOrder(address customer, uint indexOrder)  external nonReentrancy returns(Order memory) {
+    function confirmOrder(address customer, uint indexOrder) external nonReentrancy returns(Order memory) {
         if(indexOrder >= MAX_COUNT_ORDER) revert E_IndexList();
         Order memory order = OrdersList[customer][indexOrder];
         
@@ -306,7 +306,7 @@ contract OrderPlatform {
             balanceUser[order.param.customer][order.param.token] += order.param.amount;
         }
         
-        OrdersList[msg.sender][indexOrder].isActive = false;
+        OrdersList[customer][indexOrder].isActive = false;
 
         _changeHealhScoreExecutor(order.param.executor, success);
         _changeHealhScoreCustomer(order.param.customer, success);
@@ -337,21 +337,21 @@ contract OrderPlatform {
 
     function _withdraw(address token, address to, uint amount) internal returns(bool){
         if(balanceUser[to][token] < amount) revert E_NotEnoughBalance();
-        bool status = IERC20(token).transfer(to, amount);
+        bool status = ERC20(token).transfer(to, amount);
         balanceUser[to][token] -= amount;
         return status;
     }
 
     function _deposit(address token, address sender, uint amount) internal returns(bool){
-        return IERC20(token).transferFrom(sender, address(this), amount);
+        return ERC20(token).transferFrom(sender, address(this), amount);
     }
 
     function _approve(address spender, address token, uint amount) internal returns(bool){
-        return IERC20(token).approve(spender, amount);
+        return ERC20(token).approve(spender, amount);
     }
 
     //pseudo random
-    function _random(uint range) private view returns(uint){
+    function _random(uint range) internal view returns(uint){
         uint256 randomSeed = uint(keccak256(abi.encodePacked(block.prevrandao, block.timestamp, msg.sender)));
         return randomSeed % range;
     }

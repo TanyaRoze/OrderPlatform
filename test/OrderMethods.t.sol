@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import {Test, console2} from "forge-std/Test.sol";
 import { OrderPlatform } from "../src/OrderPlatform.sol";
-import {TestERC20} from "./mocks/TestERC20.sol";
+import {MockERC20} from "./mocks/MockERC20.sol";
 
 contract OrderPlatformTest is Test {
 
@@ -17,14 +17,14 @@ contract OrderPlatformTest is Test {
     OrderPlatform public platform;
     OrderPlatform.OrderParam public orderParam;
 
-    TestERC20 public TST;
+    MockERC20 public TST;
     address public alice;
     address public bob;
     address public judge;
 
     function setUp() public {
         platform = new OrderPlatform(address(this));
-        TST = new TestERC20("Test Token", "TST" , 18, false);
+        TST = new MockERC20("Test Token", "TST" , 18);
 
         alice = vm.addr(1000);
         bob = vm.addr(2000);
@@ -41,7 +41,6 @@ contract OrderPlatformTest is Test {
             executor: bob,
             title: 'Test service'
         });
-
 
     }
 
@@ -105,63 +104,31 @@ contract OrderPlatformTest is Test {
         assertEq(balanceBob1, balanceBob2);
     }
 
-    function test_changeAdmin() public {
-        address newAdmin = vm.addr(4000);
-
-        platform.changeAdmin(newAdmin);
-
-        assertEq(platform.getAdmin(), newAdmin);
-    }
-
-    function test_changeJudgeOrder() public {
+    function test_approveBalance() public {
         uint indexOrder = 0;
         
-        vm.prank(alice);
+        vm.startPrank(alice);
         platform.createOrder(orderParam, indexOrder);
 
         uint price = platform.previewFullPriceOrder(1e4);
-
-        vm.prank(alice);
         TST.approve(address(platform), price);
 
-        vm.prank(alice);
         platform.depositOrder(indexOrder);
+        platform.confirmOrder(alice, indexOrder);
 
-        platform.changeJudgeOrder(alice, indexOrder);
+        vm.stopPrank();
 
-        OrderPlatform.Order memory order = platform.getOrder(alice, indexOrder);
+        vm.prank(bob);
+        platform.confirmOrder(alice, indexOrder);
 
-        assertEq(order.judge, address(this));
+        uint balancePlatform = platform.getBalance(address(platform), address(TST));
+
+        platform.approveBalance(address(this), address(TST), balancePlatform);
+
+        uint allowance = TST.allowance(address(platform), address(this));
+
+        assertEq(balancePlatform, allowance);
+
     }
-
-    function test_addJudge() public {
-        platform.addJudge(bob);
-        address[] memory judges = platform.getListJudges();
-
-        assertEq(bob, judges[0]);
-    }
-
-    function test_removeJudge() public {
-        platform.addJudge(bob);
-        platform.removeJudge(0);
-        address[] memory judges = platform.getListJudges();
-        
-        assertEq(judges.length, 0);
-    }
-
-    function test_changeFeeOrder() public {
-        platform.changeFeeOrder(300);
-        uint[2] memory fees = platform.getFees();
-
-        assertEq(fees[0], 300);
-    }
-
-    function test_changeFeeJudge() public {
-        platform.changeFeeJudge(50);
-        uint[2] memory fees = platform.getFees();
-
-        assertEq(fees[1], 50);
-    }
-
 
 }

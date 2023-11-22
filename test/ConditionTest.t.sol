@@ -3,13 +3,13 @@ pragma solidity ^0.8.20;
 
 import {Test, console2} from "forge-std/Test.sol";
 import { OrderPlatform } from "../src/OrderPlatform.sol";
-import { TestERC20 } from "./mocks/TestERC20.sol";
+import { MockERC20 } from "./mocks/MockERC20.sol";
 
 contract ConditionTest is Test {
     OrderPlatform public platform;
     OrderPlatform.OrderParam public orderParam;
 
-    TestERC20 public TST;
+    MockERC20 public TST;
     address public alice;
     address public bob;
     address public judge;
@@ -17,7 +17,7 @@ contract ConditionTest is Test {
 
     function setUp() public {
         platform = new OrderPlatform(address(this));
-        TST = new TestERC20("Test Token", "TST" , 18, false);
+        TST = new MockERC20("Test Token", "TST" , 18);
 
         alice = vm.addr(1000);
         bob = vm.addr(2000);
